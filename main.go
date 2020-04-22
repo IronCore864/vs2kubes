@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"strings"
 
 	"github.com/hashicorp/vault/api"
 	"github.com/kelseyhightower/envconfig"
@@ -44,6 +45,24 @@ func buildK8sSecret(name string, data map[string][]byte) corev1.Secret {
 		Data: data,
 		Type: "Opaque",
 	}
+}
+
+func upcertSecret(c *kubernetes.Clientset, name, namespace string, secret *corev1.Secret) error {
+	_, err := c.CoreV1().Secrets(namespace).Get(name, metav1.GetOptions{})
+	if err != nil {
+		if strings.Index(err.Error(), "not found") >= 0 {
+			_, err = c.CoreV1().Secrets(namespace).Create(secret)
+			if err != nil {
+				return err
+			}
+		}
+	} else {
+		_, err = c.CoreV1().Secrets(namespace).Update(secret)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func main() {
@@ -92,8 +111,9 @@ func main() {
 				data[k] = []byte(value)
 			}
 
+			// upcert
 			k8sSecret := buildK8sSecret(secretName, data)
-			_, err = k8sClientset.CoreV1().Secrets(conf.K8sNamespace).Update(&k8sSecret)
+			err = upcertSecret(k8sClientset, secretName, conf.K8sNamespace, &k8sSecret)
 			if err != nil {
 				log.Fatal(err.Error())
 				panic(err.Error())
