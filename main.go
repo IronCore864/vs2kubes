@@ -68,7 +68,7 @@ func upcertSecret(c *kubernetes.Clientset, name, namespace string, secret *corev
 func main() {
 	// load config
 	var conf Config
-	err := envconfig.Process("vs2yaml", &conf)
+	err := envconfig.Process("", &conf)
 	if err != nil {
 		log.Fatal(err.Error())
 	}
