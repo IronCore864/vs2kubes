@@ -6,6 +6,7 @@ COPY go.mod go.sum main.go /app/
 RUN go build -o vs2kubes
 
 FROM alpine
+RUN apk --no-cache add ca-certificates
 WORKDIR /app
 COPY --from=build-env /app/vs2kubes /app/
 ENTRYPOINT /app/vs2kubes
