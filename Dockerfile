@@ -8,7 +8,7 @@ RUN go build -o vs2kubes
 FROM alpine
 RUN mkdir -p /home/app
 RUN addgroup app && \
-    adduser --uid 1001 --ingroup app --home /home/app --shell /bin/sh app
+    adduser -D --u 1001 --home /home/app --shell /bin/sh --ingroup app app
 ENV HOME=/home/app
 WORKDIR $HOME
 COPY --from=build-env /app/vs2kubes $HOME
