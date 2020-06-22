@@ -91,6 +91,7 @@ func buildK8sSecret(name string, data map[string][]byte) corev1.Secret {
 func upcertSecret(c *kubernetes.Clientset, name, namespace string, secret *corev1.Secret) error {
 	_, err := c.CoreV1().Secrets(namespace).Get(name, metav1.GetOptions{})
 	if err != nil {
+		log.Println(err)
 		if strings.Index(err.Error(), "not found") >= 0 {
 			log.Printf("Secret %s doesn't exist, creating ...\n", name)
 			_, err = c.CoreV1().Secrets(namespace).Create(secret)
