@@ -96,12 +96,14 @@ func upcertSecret(c *kubernetes.Clientset, name, namespace string, secret *corev
 			if err != nil {
 				return err
 			}
+			fmt.Println("Secret created: ", name)
 		}
 	} else {
 		_, err = c.CoreV1().Secrets(namespace).Update(secret)
 		if err != nil {
 			return err
 		}
+		fmt.Println("Secret updated: ", name)
 	}
 	return nil
 }
