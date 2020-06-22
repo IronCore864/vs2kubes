@@ -7,8 +7,8 @@ RUN go build -o vs2kubes
 
 FROM alpine
 RUN mkdir -p /home/app
-RUN groupadd -r app && \
-    useradd -r -g app -d /home/app -s /bin/sh -c "Docker image user" app
+RUN addgroup app && \
+    adduser --uid 1001 --ingroup app --home /home/app --shell /bin/sh app
 ENV HOME=/home/app
 WORKDIR $HOME
 COPY --from=build-env /app/vs2kubes $HOME
