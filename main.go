@@ -159,9 +159,6 @@ func main() {
 	case []interface{}:
 		for _, k := range x {
 			secretName := fmt.Sprintf("%v", k)
-			if secretName != "vehicle-registration-service" {
-				continue
-			}
 			secret, err := c.Read(fmt.Sprintf("%s/%s", readSecretPath, secretName))
 			if err != nil {
 				log.Fatal(err.Error())
