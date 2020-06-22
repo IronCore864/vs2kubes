@@ -121,6 +121,7 @@ func main() {
 	readSecretPath := fmt.Sprintf("%s/data", conf.VaultSecretPath)
 
 	// vault client
+	fmt.Println("Creating vault client ...")
 	vaultClient, err := api.NewClient(&api.Config{
 		Address: conf.VaultAddr,
 	})
@@ -134,6 +135,7 @@ func main() {
 		"role_id":   conf.RoleID,
 		"secret_id": conf.SecretID,
 	}
+	fmt.Println("App role auth ...")
 	resp, err := c.Write("auth/approle/login", data)
 	if err != nil {
 		log.Fatal(err.Error())
@@ -144,9 +146,11 @@ func main() {
 		return
 	}
 	// set token after AppRole auth
+	fmt.Println("App role auth succeeded, set token ...")
 	vaultClient.SetToken(resp.Auth.ClientToken)
 
 	// list vault secrets
+	fmt.Println("Listing all secrets from vault ...")
 	vaultSecrets, err := c.List(listSecretPath)
 	if err != nil {
 		log.Fatal(err.Error())
@@ -154,9 +158,11 @@ func main() {
 	}
 
 	// k8s client
+	fmt.Println("Creating k8s client ...")
 	k8sClientset := getK8sClientSet(conf.Local)
 
 	// iterate all vault secrets, generate k8s secret, and upcert
+	fmt.Println("Starting to create/update k8s secrets ...")
 	switch x := vaultSecrets.Data["keys"].(type) {
 	case []interface{}:
 		for _, k := range x {
@@ -181,4 +187,5 @@ func main() {
 			}
 		}
 	}
+	fmt.Println("Create/update k8s secrets done!")
 }
