@@ -6,6 +6,8 @@ A golang app using vault API to get all secrets under a given path, then use k8s
 
 At the moment, k8s client version is 1.15.11.
 
+Only KV v2 engine is supported due to V1/V2 API differences.
+
 Vault API uses AppRole auth. For configure, see: https://ironcore864.gitlab.io/#AppRole-Auth
 
 Note that you must grant enough `token_num_uses` and `secret_id_num_uses`.
@@ -25,8 +27,6 @@ export K8S_NAMESPACE=default
 export VAULT_SECRET_PATH=kv
 # optional
 export VAULT_SKIP_VERIFY=true
-# 1 or 2
-export VAULT_KV_VERSION=2
 # AppRole auth
 export VAULT_ROLE_ID=ROLE_ID
 export VAULT_SECRET_ID=SECRET_ID

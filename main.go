@@ -1,8 +1,11 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"log"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/hashicorp/vault/api"
@@ -11,6 +14,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 )
 
 // Config is the struct for environment configuration
@@ -21,9 +25,37 @@ type Config struct {
 	RoleID          string `envconfig:"VAULT_ROLE_ID"`
 	SecretID        string `envconfig:"VAULT_SECRET_ID"`
 	KvVersion       int    `envconfig:"VAULT_KV_VERSION"`
+	Local           bool   `envconfig:"LOCAL"`
 }
 
-func getK8sClientSet() *kubernetes.Clientset {
+func homeDir() string {
+	if h := os.Getenv("HOME"); h != "" {
+		return h
+	}
+	return os.Getenv("USERPROFILE") // windows
+}
+
+// used for local testing only
+func getK8sClientSetOutsideClusterConfig() *kubernetes.Clientset {
+	// use the current context in kubeconfig to create the clientset
+	var kubeconfig *string
+	if home := homeDir(); home != "" {
+		kubeconfig = flag.String("kubeconfig", filepath.Join(home, ".kube", "config"), "(optional) absolute path to the kubeconfig file")
+	} else {
+		kubeconfig = flag.String("kubeconfig", "", "absolute path to the kubeconfig file")
+	}
+	flag.Parse()
+
+	config, err := clientcmd.BuildConfigFromFlags("", *kubeconfig)
+	if err != nil {
+		panic(err.Error())
+	}
+
+	clientset, err := kubernetes.NewForConfig(config)
+	return clientset
+}
+
+func getK8sClientSetInClusterConfig() *kubernetes.Clientset {
 	config, err := rest.InClusterConfig()
 	if err != nil {
 		panic(err.Error())
@@ -33,6 +65,13 @@ func getK8sClientSet() *kubernetes.Clientset {
 		panic(err.Error())
 	}
 	return clientset
+}
+
+func getK8sClientSet(isLocal bool) *kubernetes.Clientset {
+	if isLocal {
+		return getK8sClientSetOutsideClusterConfig()
+	}
+	return getK8sClientSetInClusterConfig()
 }
 
 func buildK8sSecret(name string, data map[string][]byte) corev1.Secret {
@@ -75,16 +114,9 @@ func main() {
 		log.Fatal(err.Error())
 	}
 
-	// kv v1 vs v2
-	listSecretPath := ""
-	readSecretPath := ""
-	if conf.KvVersion == 1 {
-		listSecretPath = fmt.Sprintf("%s/", conf.VaultSecretPath)
-		readSecretPath = fmt.Sprintf("%s", conf.VaultSecretPath)
-	} else {
-		listSecretPath = fmt.Sprintf("%s/metadata/", conf.VaultSecretPath)
-		readSecretPath = fmt.Sprintf("%s/data", conf.VaultSecretPath)
-	}
+	// kv v2 only
+	listSecretPath := fmt.Sprintf("%s/metadata/", conf.VaultSecretPath)
+	readSecretPath := fmt.Sprintf("%s/data", conf.VaultSecretPath)
 
 	// vault client
 	vaultClient, err := api.NewClient(&api.Config{
@@ -120,13 +152,16 @@ func main() {
 	}
 
 	// k8s client
-	k8sClientset := getK8sClientSet()
+	k8sClientset := getK8sClientSet(conf.Local)
 
 	// iterate all vault secrets, generate k8s secret, and upcert
 	switch x := vaultSecrets.Data["keys"].(type) {
 	case []interface{}:
 		for _, k := range x {
 			secretName := fmt.Sprintf("%v", k)
+			if secretName != "vehicle-registration-service" {
+				continue
+			}
 			secret, err := c.Read(fmt.Sprintf("%s/%s", readSecretPath, secretName))
 			if err != nil {
 				log.Fatal(err.Error())
@@ -134,9 +169,8 @@ func main() {
 			}
 
 			data := make(map[string][]byte)
-			for k, v := range secret.Data {
-				value := fmt.Sprintf("%v", v)
-				data[k] = []byte(value)
+			for k, v := range secret.Data["data"].(map[string]interface{}) {
+				data[k] = []byte(fmt.Sprintf("%v", v))
 			}
 
 			// upcert
