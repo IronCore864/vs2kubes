@@ -92,18 +92,20 @@ func upcertSecret(c *kubernetes.Clientset, name, namespace string, secret *corev
 	_, err := c.CoreV1().Secrets(namespace).Get(name, metav1.GetOptions{})
 	if err != nil {
 		if strings.Index(err.Error(), "not found") >= 0 {
+			log.Printf("Secret %s doesn't exist, creating ...\n", name)
 			_, err = c.CoreV1().Secrets(namespace).Create(secret)
 			if err != nil {
 				return err
 			}
-			fmt.Println("Secret created: ", name)
+			log.Printf("Secret %s created!\n", name)
 		}
 	} else {
+		log.Printf("Secret %s exist, updating ...\n", name)
 		_, err = c.CoreV1().Secrets(namespace).Update(secret)
 		if err != nil {
 			return err
 		}
-		fmt.Println("Secret updated: ", name)
+		log.Printf("Secret %s updated!\n", name)
 	}
 	return nil
 }
@@ -121,7 +123,7 @@ func main() {
 	readSecretPath := fmt.Sprintf("%s/data", conf.VaultSecretPath)
 
 	// vault client
-	fmt.Println("Creating vault client ...")
+	log.Println("Creating vault client ...")
 	vaultClient, err := api.NewClient(&api.Config{
 		Address: conf.VaultAddr,
 	})
@@ -135,7 +137,7 @@ func main() {
 		"role_id":   conf.RoleID,
 		"secret_id": conf.SecretID,
 	}
-	fmt.Println("App role auth ...")
+	log.Println("App role auth ...")
 	resp, err := c.Write("auth/approle/login", data)
 	if err != nil {
 		log.Fatal(err.Error())
@@ -146,11 +148,11 @@ func main() {
 		return
 	}
 	// set token after AppRole auth
-	fmt.Println("App role auth succeeded, set token ...")
+	log.Println("App role auth succeeded, set token ...")
 	vaultClient.SetToken(resp.Auth.ClientToken)
 
 	// list vault secrets
-	fmt.Println("Listing all secrets from vault ...")
+	log.Println("Listing all secrets from vault ...")
 	vaultSecrets, err := c.List(listSecretPath)
 	if err != nil {
 		log.Fatal(err.Error())
@@ -158,15 +160,16 @@ func main() {
 	}
 
 	// k8s client
-	fmt.Println("Creating k8s client ...")
+	log.Println("Creating k8s client ...")
 	k8sClientset := getK8sClientSet(conf.Local)
 
 	// iterate all vault secrets, generate k8s secret, and upcert
-	fmt.Println("Starting to create/update k8s secrets ...")
+	log.Println("Starting to create/update k8s secrets ...")
 	switch x := vaultSecrets.Data["keys"].(type) {
 	case []interface{}:
 		for _, k := range x {
 			secretName := fmt.Sprintf("%v", k)
+			log.Printf("Processing secret %s ...\n", secretName)
 			secret, err := c.Read(fmt.Sprintf("%s/%s", readSecretPath, secretName))
 			if err != nil {
 				log.Fatal(err.Error())
@@ -187,5 +190,5 @@ func main() {
 			}
 		}
 	}
-	fmt.Println("Create/update k8s secrets done!")
+	log.Println("Create/update k8s secrets done!...")
 }
